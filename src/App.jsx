@@ -11,18 +11,18 @@ import BottomNav from './components/BottomNav'
 
 const TAB_COMPONENTS = {
   dashboard: Dashboard,
-  nutrition: NutritionLog,
-  workout: WorkoutLog,
-  weight: WeightLog,
-  chat: Chat,
-  settings: Settings,
+  nutrition:  NutritionLog,
+  workout:    WorkoutLog,
+  weight:     WeightLog,
+  chat:       Chat,
+  settings:   Settings,
 }
 
 export default function App() {
-  const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [session, setSession]     = useState(null)
+  const [loading, setLoading]     = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [mounted, setMounted] = useState(new Set(['dashboard']))
+  const [mounted, setMounted]     = useState(new Set(['dashboard']))
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
@@ -34,21 +34,15 @@ export default function App() {
       setSession(session)
       setLoading(false)
     })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center" style={{ background: '#F7F4EE' }}>
-        <div className="w-6 h-6 rounded-full border-2 border-[#C4714A] border-t-transparent animate-spin" />
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="min-h-dvh flex items-center justify-center" style={{ background: '#F7F4EE' }}>
+      <div className="w-6 h-6 rounded-full border-2 border-[#C4714A] border-t-transparent animate-spin" />
+    </div>
+  )
 
   if (!session) return <Auth />
 
@@ -57,13 +51,14 @@ export default function App() {
       <main className="flex-1">
         {Object.entries(TAB_COMPONENTS).map(([key, Component]) => {
           if (!mounted.has(key)) return null
+          const isActive = activeTab === key
           return (
             <div
               key={key}
-              style={{ display: activeTab === key ? 'block' : 'none' }}
+              style={{ display: isActive ? 'block' : 'none' }}
               className={key === 'chat' ? 'h-dvh' : 'pb-20'}
             >
-              <Component session={session} />
+              <Component session={session} isActive={isActive} />
             </div>
           )
         })}

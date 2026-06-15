@@ -95,7 +95,7 @@ function AlimentoRow({ item, onChange, onRemove }) {
   )
 }
 
-export default function NutritionLog({ session }) {
+export default function NutritionLog({ session, isActive }) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [parsed, setParsed] = useState(null)
@@ -119,6 +119,7 @@ export default function NutritionLog({ session }) {
   }
 
   useEffect(() => { fetchData() }, [session])
+  useEffect(() => { if (isActive) fetchData() }, [isActive])
 
   const parseNutrition = async () => {
     if (!text.trim()) return

@@ -107,7 +107,7 @@ function EjercicioRow({ item, onChange, onRemove }) {
   )
 }
 
-export default function WorkoutLog({ session }) {
+export default function WorkoutLog({ session, isActive }) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [parsed, setParsed] = useState(null)
@@ -131,6 +131,7 @@ export default function WorkoutLog({ session }) {
   }
 
   useEffect(() => { fetchData() }, [session])
+  useEffect(() => { if (isActive) fetchData() }, [isActive])
 
   const parseWorkout = async () => {
     if (!text.trim()) return

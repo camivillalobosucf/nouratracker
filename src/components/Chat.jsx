@@ -72,6 +72,17 @@ export default function Chat({ session }) {
         recentWorkouts: workRes.data || [],
         todayLogs: todayRes.data || [],
       })
+
+      // chatRes.error means the table doesn't exist yet
+      if (chatRes.error) {
+        setMessages([{
+          role: 'assistant',
+          content: '⚠️ Falta crear las tablas en Supabase. Ve al SQL Editor de tu proyecto Supabase y ejecuta el archivo `supabase-schema.sql` del repo para crear `chat_messages` y `user_plan`.'
+        }])
+        setInitialized(true)
+        return
+      }
+
       if (chatRes.data?.length) {
         setMessages(chatRes.data)
       } else {
