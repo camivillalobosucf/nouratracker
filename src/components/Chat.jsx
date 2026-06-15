@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { supabase } from '../lib/supabase'
 
 const today = () => new Date().toISOString().split('T')[0]
@@ -14,11 +15,26 @@ function MessageBubble({ msg }) {
           color: isUser ? '#fff' : '#1C1C1A',
           borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
           lineHeight: 1.6,
-          whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
         }}
       >
-        {msg.content}
+        {isUser ? (
+          <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+        ) : (
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => <p style={{ margin: '0 0 6px' }}>{children}</p>,
+              strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+              ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 16 }}>{children}</ul>,
+              ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 16 }}>{children}</ol>,
+              li: ({ children }) => <li style={{ margin: '2px 0' }}>{children}</li>,
+              h3: ({ children }) => <p style={{ fontWeight: 600, margin: '6px 0 2px' }}>{children}</p>,
+              h2: ({ children }) => <p style={{ fontWeight: 600, margin: '6px 0 2px' }}>{children}</p>,
+            }}
+          >
+            {msg.content}
+          </ReactMarkdown>
+        )}
       </div>
     </div>
   )
