@@ -68,3 +68,34 @@ create policy "user_goals: own rows only"
   on user_goals for all
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- 5. AI Plan & Chat tables
+
+create table if not exists user_plan (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null unique,
+  nutricion jsonb,
+  entrenamiento jsonb,
+  updated_at timestamptz default now()
+);
+
+create table if not exists chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz default now()
+);
+
+alter table user_plan enable row level security;
+alter table chat_messages enable row level security;
+
+create policy "user_plan: own rows only"
+  on user_plan for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+create policy "chat_messages: own rows only"
+  on chat_messages for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());

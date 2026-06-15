@@ -6,6 +6,7 @@ import NutritionLog from './components/NutritionLog'
 import WorkoutLog from './components/WorkoutLog'
 import WeightLog from './components/WeightLog'
 import Settings from './components/Settings'
+import Chat from './components/Chat'
 import BottomNav from './components/BottomNav'
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
     nutrition: <NutritionLog session={session} />,
     workout: <WorkoutLog session={session} />,
     weight: <WeightLog session={session} />,
+    chat: <Chat session={session} />,
     settings: <Settings session={session} />,
   }
 

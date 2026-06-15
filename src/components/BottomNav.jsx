@@ -23,20 +23,20 @@ const tabs = [
     )
   },
   {
+    id: 'chat',
+    label: 'Chat',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+      </svg>
+    )
+  },
+  {
     id: 'workout',
     label: 'Entreno',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M6.5 6.5h11M6.5 17.5h11M4 10h1.5a1 1 0 011 1v2a1 1 0 01-1 1H4M20 10h-1.5a1 1 0 00-1 1v2a1 1 0 001 1H20M2 12h2M20 12h2" />
-      </svg>
-    )
-  },
-  {
-    id: 'weight',
-    label: 'Peso',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
     )
   },
@@ -55,13 +55,12 @@ const tabs = [
 export default function BottomNav({ active, onChange }) {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t"
+      className="fixed bottom-0 z-50 flex items-center justify-around border-t"
       style={{
         background: '#F7F4EE',
         borderColor: '#DDD8CE',
         paddingBottom: 'env(safe-area-inset-bottom)',
         maxWidth: 512,
-        margin: '0 auto',
         left: '50%',
         transform: 'translateX(-50%)',
         width: '100%'
@@ -73,7 +72,7 @@ export default function BottomNav({ active, onChange }) {
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className="flex flex-col items-center gap-0.5 py-2 px-3 flex-1"
+            className="flex flex-col items-center gap-0.5 py-2 px-2 flex-1"
             style={{ color: isActive ? '#C4714A' : '#999', transition: 'color 0.15s' }}
           >
             {tab.icon}
