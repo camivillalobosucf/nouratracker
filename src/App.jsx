@@ -9,10 +9,25 @@ import Settings from './components/Settings'
 import Chat from './components/Chat'
 import BottomNav from './components/BottomNav'
 
+const TAB_COMPONENTS = {
+  dashboard: Dashboard,
+  nutrition: NutritionLog,
+  workout: WorkoutLog,
+  weight: WeightLog,
+  chat: Chat,
+  settings: Settings,
+}
+
 export default function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [mounted, setMounted] = useState(new Set(['dashboard']))
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    setMounted(prev => new Set([...prev, tab]))
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -35,25 +50,25 @@ export default function App() {
     )
   }
 
-  if (!session) {
-    return <Auth />
-  }
-
-  const tabs = {
-    dashboard: <Dashboard session={session} />,
-    nutrition: <NutritionLog session={session} />,
-    workout: <WorkoutLog session={session} />,
-    weight: <WeightLog session={session} />,
-    chat: <Chat session={session} />,
-    settings: <Settings session={session} />,
-  }
+  if (!session) return <Auth />
 
   return (
     <div className="min-h-dvh flex flex-col max-w-lg mx-auto" style={{ background: '#F7F4EE' }}>
-      <main className="flex-1 pb-20">
-        {tabs[activeTab]}
+      <main className="flex-1">
+        {Object.entries(TAB_COMPONENTS).map(([key, Component]) => {
+          if (!mounted.has(key)) return null
+          return (
+            <div
+              key={key}
+              style={{ display: activeTab === key ? 'block' : 'none' }}
+              className={key === 'chat' ? 'h-dvh' : 'pb-20'}
+            >
+              <Component session={session} />
+            </div>
+          )
+        })}
       </main>
-      <BottomNav active={activeTab} onChange={setActiveTab} />
+      <BottomNav active={activeTab} onChange={handleTabChange} />
     </div>
   )
 }

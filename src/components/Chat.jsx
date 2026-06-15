@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const today = () => new Date().toISOString().split('T')[0]
@@ -13,8 +13,9 @@ function MessageBubble({ msg }) {
           background: isUser ? '#C4714A' : '#EFEBE3',
           color: isUser ? '#fff' : '#1C1C1A',
           borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-          lineHeight: 1.55,
-          whiteSpace: 'pre-wrap'
+          lineHeight: 1.6,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
         }}
       >
         {msg.content}
@@ -29,9 +30,12 @@ export default function Chat({ session }) {
   const [loading, setLoading] = useState(false)
   const [planSaved, setPlanSaved] = useState(false)
   const [context, setContext] = useState({})
+  const [initialized, setInitialized] = useState(false)
   const bottomRef = useRef(null)
+  const textareaRef = useRef(null)
 
   useEffect(() => {
+    if (initialized) return
     const uid = session.user.id
     const from = new Date()
     from.setDate(from.getDate() - 7)
@@ -43,7 +47,7 @@ export default function Chat({ session }) {
       supabase.from('nutrition_logs').select('fecha, descripcion_original, totales').eq('user_id', uid).gte('fecha', fromStr).order('fecha', { ascending: false }),
       supabase.from('workout_logs').select('fecha, ejercicios').eq('user_id', uid).gte('fecha', fromStr).order('fecha', { ascending: false }),
       supabase.from('nutrition_logs').select('descripcion_original, totales').eq('user_id', uid).eq('fecha', today()),
-      supabase.from('chat_messages').select('role, content').eq('user_id', uid).order('created_at').limit(40),
+      supabase.from('chat_messages').select('role, content').eq('user_id', uid).order('created_at').limit(60),
     ]).then(([goalsRes, planRes, nutRes, workRes, todayRes, chatRes]) => {
       setContext({
         goals: goalsRes.data,
@@ -57,26 +61,43 @@ export default function Chat({ session }) {
       } else {
         setMessages([{
           role: 'assistant',
-          content: '¡Hola! Soy Noura, tu asistente de nutrición y entrenamiento. 💪\n\nPuedo ayudarte a crear un plan personalizado con los alimentos exactos (en gramos), horarios y suplementos. ¿Cuáles son tus metas y qué alimentos te gustan?'
+          content: '¡Hola! Soy Noura, tu asistente de nutrición y entrenamiento.\n\nPuedo crearte un plan personalizado con los alimentos exactos (en gramos), horarios y suplementos. Cuéntame:\n\n• ¿Cuáles son tus metas?\n• ¿Qué alimentos te gustan o no te gustan?\n• ¿Cuántos días a la semana entrenas?'
         }])
       }
+      setInitialized(true)
     })
-  }, [session])
+  }, [session, initialized])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, loading])
 
-  const send = async () => {
+  // Auto-grow textarea
+  const handleInputChange = (e) => {
+    setInput(e.target.value)
+    const ta = textareaRef.current
+    if (ta) {
+      ta.style.height = 'auto'
+      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
+    }
+  }
+
+  const send = useCallback(async () => {
     const text = input.trim()
     if (!text || loading) return
 
     const userMsg = { role: 'user', content: text }
-    const newMessages = [...messages.filter(m => m.role), userMsg]
+    const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setInput('')
-    setLoading(true)
     setPlanSaved(false)
+
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+    }
+
+    setLoading(true)
 
     try {
       const res = await fetch('/api/chat', {
@@ -91,14 +112,11 @@ export default function Chat({ session }) {
       setMessages(prev => [...prev, assistantMsg])
 
       const uid = session.user.id
-
-      // Save messages to Supabase
       await supabase.from('chat_messages').insert([
         { user_id: uid, role: 'user', content: text },
         { user_id: uid, role: 'assistant', content: data.content }
       ])
 
-      // Save plan if Claude generated one
       if (data.plan) {
         const { data: existing } = await supabase.from('user_plan').select('id').eq('user_id', uid).single()
         if (existing) {
@@ -117,19 +135,12 @@ export default function Chat({ session }) {
         setContext(prev => ({ ...prev, plan: data.plan }))
         setPlanSaved(true)
       }
-    } catch (err) {
+    } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error al conectar. Intenta de nuevo.' }])
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send()
-    }
-  }
+  }, [input, loading, messages, context, session])
 
   const clearChat = async () => {
     await supabase.from('chat_messages').delete().eq('user_id', session.user.id)
@@ -140,72 +151,85 @@ export default function Chat({ session }) {
   }
 
   return (
-    <div className="flex flex-col h-dvh">
+    <div className="flex flex-col" style={{ height: '100dvh' }}>
       {/* Header */}
-      <div className="px-4 pt-8 pb-3 flex justify-between items-center">
+      <div
+        className="px-4 pt-10 pb-3 flex justify-between items-center shrink-0"
+        style={{ background: '#F7F4EE' }}
+      >
         <h1 className="text-3xl" style={{ fontFamily: "'DM Serif Display', serif", color: '#1C1C1A' }}>
           Chat
         </h1>
-        <button onClick={clearChat} className="text-xs" style={{ color: '#bbb' }}>
+        <button onClick={clearChat} className="text-xs py-1 px-2" style={{ color: '#bbb' }}>
           Limpiar
         </button>
       </div>
 
       {planSaved && (
-        <div className="mx-4 mb-2 px-3 py-2 text-sm" style={{ background: '#e8f0e9', color: '#7A9E7E', borderRadius: 8 }}>
+        <div
+          className="mx-4 mb-1 px-3 py-2 text-sm shrink-0"
+          style={{ background: '#e8f0e9', color: '#7A9E7E', borderRadius: 8 }}
+        >
           ✓ Plan guardado — ya aparece en Comida y Entreno
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      {/* Messages — scrollable area */}
+      <div className="flex-1 overflow-y-auto px-4 pt-2" style={{ overscrollBehavior: 'contain' }}>
         {messages.map((msg, i) => (
           <MessageBubble key={i} msg={msg} />
         ))}
         {loading && (
           <div className="flex justify-start mb-3">
-            <div className="px-4 py-3 text-sm" style={{ background: '#EFEBE3', borderRadius: '16px 16px 16px 4px', color: '#aaa' }}>
+            <div
+              className="px-4 py-3 text-sm"
+              style={{ background: '#EFEBE3', borderRadius: '16px 16px 16px 4px', color: '#aaa' }}
+            >
               <span className="animate-pulse">Noura está escribiendo...</span>
             </div>
           </div>
         )}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="h-2" />
       </div>
 
-      {/* Input */}
+      {/* Input bar — fixed at bottom above BottomNav */}
       <div
-        className="px-4 py-3 border-t flex gap-2 items-end"
+        className="shrink-0 px-3 py-2 border-t flex gap-2 items-end"
         style={{
           background: '#F7F4EE',
           borderColor: '#DDD8CE',
-          paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)'
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)',
         }}
       >
         <textarea
+          ref={textareaRef}
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="Escribe aquí... (Enter para enviar)"
-          rows={2}
-          className="flex-1 px-3 py-2 text-sm outline-none border resize-none"
+          onChange={handleInputChange}
+          placeholder="Escribe un mensaje..."
+          rows={1}
+          className="flex-1 px-3 py-2.5 outline-none border resize-none"
           style={{
             background: '#EFEBE3',
             borderColor: '#DDD8CE',
             color: '#1C1C1A',
-            borderRadius: 10,
-            lineHeight: 1.5
+            borderRadius: 12,
+            fontSize: 16,        // prevents iOS auto-zoom
+            lineHeight: 1.5,
+            maxHeight: 120,
+            overflowY: 'auto',
           }}
         />
         <button
           onClick={send}
           disabled={loading || !input.trim()}
-          className="shrink-0 w-10 h-10 flex items-center justify-center"
+          className="shrink-0 w-11 h-11 flex items-center justify-center"
           style={{
             background: loading || !input.trim() ? '#d89a80' : '#C4714A',
-            borderRadius: 10
+            borderRadius: 12,
+            transition: 'background 0.15s',
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
             <line x1="22" y1="2" x2="11" y2="13" />
             <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
