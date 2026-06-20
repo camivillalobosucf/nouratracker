@@ -5,7 +5,7 @@ import Dashboard from './components/Dashboard'
 import NutritionLog from './components/NutritionLog'
 import WorkoutLog from './components/WorkoutLog'
 import WeightLog from './components/WeightLog'
-import Settings from './components/Settings'
+import Profile from './components/Profile'
 import Chat from './components/Chat'
 import BottomNav from './components/BottomNav'
 
@@ -15,17 +15,20 @@ const TAB_COMPONENTS = {
   workout:    WorkoutLog,
   weight:     WeightLog,
   chat:       Chat,
-  settings:   Settings,
+  profile:    Profile,
 }
 
 export default function App() {
   const [session, setSession]     = useState(null)
   const [loading, setLoading]     = useState(true)
-  const [activeTab, setActiveTab] = useState(() =>
-    localStorage.getItem('noura_tab') || 'dashboard'
-  )
-  const [mounted, setMounted] = useState(() => {
+  const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('noura_tab') || 'dashboard'
+    // migrate old 'settings' key to 'profile'
+    return saved === 'settings' ? 'profile' : saved
+  })
+  const [mounted, setMounted] = useState(() => {
+    const raw   = localStorage.getItem('noura_tab') || 'dashboard'
+    const saved = raw === 'settings' ? 'profile' : raw
     return new Set(['dashboard', saved])
   })
 

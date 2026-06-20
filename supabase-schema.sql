@@ -121,7 +121,30 @@ create policy "chat_sessions: own rows only"
 alter table chat_messages
   add column if not exists chat_id uuid references chat_sessions(id) on delete cascade;
 
--- 7. Meal type on nutrition logs (migration for existing DBs)
+-- 7. User profile (personal info + goal pills)
+-- Migration for existing DBs: run this block in Supabase SQL Editor
+
+create table if not exists user_profile (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null unique,
+  nombre text,
+  edad integer,
+  peso_kg numeric(5,2),
+  estatura_cm integer,
+  genero text,
+  nivel_actividad text,
+  metas text[],
+  updated_at timestamptz default now()
+);
+
+alter table user_profile enable row level security;
+
+create policy "user_profile: own rows only"
+  on user_profile for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- 8. Meal type on nutrition logs (migration for existing DBs)
 alter table nutrition_logs
   add column if not exists tipo_comida text
     check (tipo_comida in ('desayuno','almuerzo','merienda','post_entreno','cena','suplementos'));
