@@ -25,8 +25,9 @@ const PALETTE = {
   red:    { bg: '#fde8df', text: '#a05030', dot: '#C4714A' },
 }
 
-const BORDER       = '1px solid #CCC8BF'
-const BORDER_THICK = '2px solid #C8C3BA'
+const BORDER        = '1px solid #CCC8BF'
+const BORDER_THICK  = '2px solid #C8C3BA'
+const COL_GRID      = '1fr auto'   // food name grows, peso column auto-sizes
 
 function categorizePlanItem(nombre) {
   const n = nombre.toLowerCase()
@@ -65,17 +66,36 @@ function rowColor(ratio) {
   return 'red'
 }
 
+// ── Column header row ──────────────────────────────────────────────────────
+
+function ColHeaders() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: '#E0DCD4', borderBottom: BORDER_THICK }}>
+      <div style={{ padding: '7px 14px', borderRight: BORDER }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#777' }}>
+          Alimento
+        </span>
+      </div>
+      <div style={{ padding: '7px 14px', minWidth: 72 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#777' }}>
+          Peso
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ── Meal section header ────────────────────────────────────────────────────
 
 function MealHeader({ label, first }) {
   return (
     <div style={{
-      padding: '7px 14px',
+      padding: '8px 14px',
       background: '#EFEBE3',
       borderTop: first ? 'none' : '3px double #C8C3BA',
       borderBottom: BORDER,
     }}>
-      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#C4714A' }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: '#C4714A' }}>
         {label}
       </span>
     </div>
@@ -86,27 +106,34 @@ function MealHeader({ label, first }) {
 
 function MacroHeader({ label }) {
   return (
-    <div style={{ padding: '4px 14px', background: '#F2EFE8', borderBottom: BORDER }}>
-      <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#aaa' }}>
-        {label}
-      </span>
+    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: '#F2EFE8', borderBottom: BORDER }}>
+      <div style={{ padding: '4px 14px', borderRight: BORDER }}>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#aaa' }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ minWidth: 72 }} />
     </div>
   )
 }
 
-// ── Two-line food row ──────────────────────────────────────────────────────
+// ── Food row: two columns, name wraps naturally ────────────────────────────
 
 function FoodRow({ nombre, cantidad, color }) {
   const c = color ? PALETTE[color] : null
   return (
-    <div style={{ padding: '9px 14px', background: c ? c.bg : '#F7F4EE', borderBottom: BORDER }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-        {c && <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0, marginTop: 1 }} />}
-        <span style={{ fontSize: 14, color: '#1C1C1A', lineHeight: 1.3 }}>{nombre}</span>
+    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, alignItems: 'start', background: c ? c.bg : '#F7F4EE', borderBottom: BORDER }}>
+      {/* Alimento cell */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', borderRight: BORDER }}>
+        {c && <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0, marginTop: 4 }} />}
+        <span style={{ fontSize: 14, color: '#1C1C1A', lineHeight: 1.4 }}>{nombre}</span>
       </div>
-      <span style={{ fontSize: 13, color: c ? c.text : '#888', paddingLeft: c ? 16 : 0 }}>
-        {cantidad || '—'}
-      </span>
+      {/* Peso cell */}
+      <div style={{ padding: '10px 14px', minWidth: 72 }}>
+        <span style={{ fontSize: 13, color: c ? c.text : '#888', whiteSpace: 'nowrap' }}>
+          {cantidad || '—'}
+        </span>
+      </div>
     </div>
   )
 }
@@ -119,6 +146,7 @@ function PlanTable({ plan, todayFoodsByMeal }) {
 
   return (
     <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: BORDER_THICK }}>
+      <ColHeaders />
       {activeMeals.map((meal, mealIdx) => {
         const items    = plan[meal.key] || []
         const mealFoods = todayFoodsByMeal[meal.key] || []
@@ -162,6 +190,7 @@ function LoggedTable({ todayFoodsByMeal }) {
 
   return (
     <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: BORDER_THICK }}>
+      <ColHeaders />
       {mealsWithFood.map((meal, mealIdx) => {
         const foods   = todayFoodsByMeal[meal.key] || []
         const grouped = Object.fromEntries(MACRO_ORDER.map(k => [k, []]))

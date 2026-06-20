@@ -21,12 +21,18 @@ const TAB_COMPONENTS = {
 export default function App() {
   const [session, setSession]     = useState(null)
   const [loading, setLoading]     = useState(true)
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [mounted, setMounted]     = useState(new Set(['dashboard']))
+  const [activeTab, setActiveTab] = useState(() =>
+    localStorage.getItem('noura_tab') || 'dashboard'
+  )
+  const [mounted, setMounted] = useState(() => {
+    const saved = localStorage.getItem('noura_tab') || 'dashboard'
+    return new Set(['dashboard', saved])
+  })
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     setMounted(prev => new Set([...prev, tab]))
+    localStorage.setItem('noura_tab', tab)
   }
 
   useEffect(() => {
