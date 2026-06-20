@@ -58,6 +58,39 @@ function rowColor(ratio) {
   return 'red'
 }
 
+// ── Shared table constants ─────────────────────────────────────────────────
+
+const QTY_W       = 88   // fixed px width for quantity column
+const BORDER      = '1px solid #CCC8BF'
+const BORDER_THICK = '2px solid #C8C3BA'
+const COL_GRID    = `1fr ${QTY_W}px`
+
+function ColHeaders({ background = '#E0DCD4' }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, background, borderBottom: BORDER_THICK }}>
+      <div style={{ padding: '7px 14px', borderRight: BORDER }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#777' }}>Alimento</span>
+      </div>
+      <div style={{ padding: '7px 14px' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#777' }}>Cantidad</span>
+      </div>
+    </div>
+  )
+}
+
+function MacroHeader({ label }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: '#F2EFE8', borderBottom: BORDER }}>
+      <div style={{ padding: '4px 14px', borderRight: BORDER }}>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#aaa' }}>
+          {label}
+        </span>
+      </div>
+      <div />
+    </div>
+  )
+}
+
 // ── Plan table (when user has a saved plan) ────────────────────────────────
 
 function PlanTable({ plan, todayFoods }) {
@@ -65,23 +98,18 @@ function PlanTable({ plan, todayFoods }) {
   if (!activeMeals.length) return null
 
   return (
-    <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #DDD8CE' }}>
-      {/* Column headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#E8E4DC', borderBottom: '1px solid #DDD8CE', padding: '8px 16px' }}>
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Alimento</span>
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Cantidad</span>
-      </div>
+    <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: BORDER_THICK }}>
+      <ColHeaders />
 
       {activeMeals.map((meal, mealIdx) => {
         const items = plan[meal.key] || []
-
         const grouped = Object.fromEntries(MACRO_ORDER.map(k => [k, []]))
         items.forEach(item => grouped[categorizePlanItem(item.nombre)].push(item))
 
         return (
-          <div key={meal.key} style={{ borderTop: mealIdx > 0 ? '2px solid #DDD8CE' : 'none' }}>
-            {/* Meal header */}
-            <div style={{ padding: '7px 16px', background: '#EFEBE3' }}>
+          <div key={meal.key} style={{ borderTop: mealIdx > 0 ? '3px double #C8C3BA' : 'none' }}>
+            {/* Meal section header — full width, no vertical split */}
+            <div style={{ padding: '6px 14px', background: '#EFEBE3', borderBottom: BORDER }}>
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#C4714A' }}>
                 {meal.label}
               </span>
@@ -92,36 +120,27 @@ function PlanTable({ plan, todayFoods }) {
               if (!catItems.length) return null
               return (
                 <div key={cat}>
-                  {/* Macro category sub-header */}
-                  <div style={{ padding: '4px 16px', background: '#F7F4EE', borderTop: '1px solid #EEE9E2', borderBottom: '1px solid #EEE9E2' }}>
-                    <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#bbb' }}>
-                      {MACRO_LABELS[cat]}
-                    </span>
-                  </div>
-                  {/* Food rows */}
+                  <MacroHeader label={MACRO_LABELS[cat]} />
                   {catItems.map((item, i) => {
                     const c = PALETTE[rowColor(matchRatio(item, todayFoods))]
                     return (
                       <div
                         key={i}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr auto',
-                          alignItems: 'center',
-                          padding: '9px 16px',
-                          background: c.bg,
-                          borderBottom: '1px solid #EEE9E2',
-                        }}
+                        style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: c.bg, borderBottom: BORDER }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        {/* Alimento */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRight: BORDER, minWidth: 0 }}>
                           <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
                           <span style={{ fontSize: 14, color: '#1C1C1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {item.nombre}
                           </span>
                         </div>
-                        <span style={{ fontSize: 13, color: c.text, marginLeft: 12, whiteSpace: 'nowrap' }}>
-                          {item.descripcion || (item.cantidad_g ? `${item.cantidad_g}g` : '—')}
-                        </span>
+                        {/* Cantidad */}
+                        <div style={{ padding: '9px 14px', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, color: c.text, whiteSpace: 'nowrap' }}>
+                            {item.descripcion || (item.cantidad_g ? `${item.cantidad_g}g` : '—')}
+                          </span>
+                        </div>
                       </div>
                     )
                   })}
@@ -144,38 +163,28 @@ function LoggedTable({ foods }) {
   foods.forEach(item => grouped[categorizeLoggedItem(item)].push(item))
 
   return (
-    <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #DDD8CE' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#E8E4DC', borderBottom: '1px solid #DDD8CE', padding: '8px 16px' }}>
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Alimento</span>
-        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Cantidad</span>
-      </div>
+    <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: BORDER_THICK }}>
+      <ColHeaders />
 
       {MACRO_ORDER.map(cat => {
         const catItems = grouped[cat]
         if (!catItems.length) return null
         return (
           <div key={cat}>
-            <div style={{ padding: '4px 16px', background: '#F7F4EE', borderBottom: '1px solid #EEE9E2' }}>
-              <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#bbb' }}>
-                {MACRO_LABELS[cat]}
-              </span>
-            </div>
+            <MacroHeader label={MACRO_LABELS[cat]} />
             {catItems.map((item, i) => (
               <div
                 key={i}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  alignItems: 'center',
-                  padding: '9px 16px',
-                  background: '#F7F4EE',
-                  borderBottom: '1px solid #EEE9E2',
-                }}
+                style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: '#F7F4EE', borderBottom: BORDER }}
               >
-                <span style={{ fontSize: 14, color: '#1C1C1A' }}>{item.nombre}</span>
-                <span style={{ fontSize: 13, color: '#888', marginLeft: 12, whiteSpace: 'nowrap' }}>
-                  {item.cantidad_g ? `${item.cantidad_g}g` : '—'}
-                </span>
+                <div style={{ padding: '9px 14px', borderRight: BORDER }}>
+                  <span style={{ fontSize: 14, color: '#1C1C1A' }}>{item.nombre}</span>
+                </div>
+                <div style={{ padding: '9px 14px' }}>
+                  <span style={{ fontSize: 13, color: '#888', whiteSpace: 'nowrap' }}>
+                    {item.cantidad_g ? `${item.cantidad_g}g` : '—'}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
