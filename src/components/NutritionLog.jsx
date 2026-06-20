@@ -27,7 +27,7 @@ const PALETTE = {
 
 const BORDER        = '1px solid #CCC8BF'
 const BORDER_THICK  = '2px solid #C8C3BA'
-const COL_GRID      = '1fr auto'   // food name grows, peso column auto-sizes
+const COL_GRID      = '1fr 80px'   // fixed 80px right column keeps divider at same position
 
 function categorizePlanItem(nombre) {
   const n = nombre.toLowerCase()
@@ -89,15 +89,11 @@ function ColHeaders() {
 
 function MealHeader({ label, first }) {
   return (
-    <div style={{
-      padding: '8px 14px',
-      background: '#EFEBE3',
-      borderTop: first ? 'none' : '3px double #C8C3BA',
-      borderBottom: BORDER,
-    }}>
-      <span style={{ fontSize: 14, fontWeight: 700, color: '#C4714A' }}>
-        {label}
-      </span>
+    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: '#EFEBE3', borderTop: first ? 'none' : '3px double #C8C3BA', borderBottom: BORDER }}>
+      <div style={{ padding: '8px 14px', borderRight: BORDER }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#C4714A' }}>{label}</span>
+      </div>
+      <div />
     </div>
   )
 }
@@ -129,8 +125,8 @@ function FoodRow({ nombre, cantidad, color }) {
         <span style={{ fontSize: 14, color: '#1C1C1A', lineHeight: 1.4 }}>{nombre}</span>
       </div>
       {/* Peso cell */}
-      <div style={{ padding: '10px 14px', minWidth: 72 }}>
-        <span style={{ fontSize: 13, color: c ? c.text : '#888', whiteSpace: 'nowrap' }}>
+      <div style={{ padding: '10px 14px' }}>
+        <span style={{ fontSize: 13, color: '#555', whiteSpace: 'nowrap' }}>
           {cantidad || '—'}
         </span>
       </div>

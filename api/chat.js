@@ -7,9 +7,9 @@ const DAYS_ES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes',
 const alimentoItem = {
   type: 'object',
   properties: {
-    nombre:      { type: 'string' },
-    cantidad_g:  { type: 'number' },
-    descripcion: { type: 'string' }
+    nombre:      { type: 'string', description: 'Nombre del alimento' },
+    cantidad_g:  { type: 'number', description: 'Cantidad numérica en gramos (usa 0 si se mide en ml o unidades)' },
+    descripcion: { type: 'string', description: 'Cantidad con su unidad en formato MUY corto: solo el número y la unidad. Ejemplos: "150ml", "40g", "2", "1 taza", "3 unidades", "400ml". NUNCA texto largo ni explicaciones.' }
   },
   required: ['nombre', 'cantidad_g', 'descripcion']
 }
