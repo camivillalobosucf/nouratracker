@@ -46,12 +46,19 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
+function greeting(name) {
+  const h = new Date().getHours()
+  const time = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'
+  return name ? `${time}, ${name}` : time
+}
+
 export default function Dashboard({ session }) {
   const [goals, setGoals] = useState(DEFAULT_GOALS)
   const [todayNutrition, setTodayNutrition] = useState(null)
   const [weekCalories, setWeekCalories] = useState([])
   const [weekWeight, setWeekWeight] = useState([])
   const [recentWorkouts, setRecentWorkouts] = useState([])
+  const [userName, setUserName] = useState('')
 
   useEffect(() => {
     const uid = session.user.id
@@ -62,9 +69,11 @@ export default function Dashboard({ session }) {
       supabase.from('user_goals').select('*').eq('user_id', uid).single(),
       supabase.from('nutrition_logs').select('fecha, totales').eq('user_id', uid).gte('fecha', from),
       supabase.from('weight_logs').select('fecha, peso_kg').eq('user_id', uid).gte('fecha', from).order('fecha'),
-      supabase.from('workout_logs').select('fecha, descripcion_original, ejercicios').eq('user_id', uid).gte('fecha', from).order('fecha', { ascending: false })
-    ]).then(([goalsRes, nutRes, weightRes, workRes]) => {
+      supabase.from('workout_logs').select('fecha, descripcion_original, ejercicios').eq('user_id', uid).gte('fecha', from).order('fecha', { ascending: false }),
+      supabase.from('user_profile').select('nombre').eq('user_id', uid).single(),
+    ]).then(([goalsRes, nutRes, weightRes, workRes, profileRes]) => {
       if (goalsRes.data) setGoals(goalsRes.data)
+      if (profileRes.data?.nombre) setUserName(profileRes.data.nombre)
 
       const nutMap = {}
       ;(nutRes.data || []).forEach(r => { nutMap[r.fecha] = r.totales })
@@ -92,9 +101,12 @@ export default function Dashboard({ session }) {
 
   return (
     <div className="px-4 pt-8 pb-4">
-      <h1 className="text-3xl mb-6" style={{ fontFamily: "'DM Serif Display', serif", color: '#1C1C1A' }}>
-        Hoy
+      <h1 className="text-3xl mb-1" style={{ fontFamily: "'DM Serif Display', serif", color: '#1C1C1A' }}>
+        {greeting(userName)}
       </h1>
+      <p className="text-sm mb-5" style={{ color: '#aaa' }}>
+        {new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}
+      </p>
 
       {/* Calorías */}
       <div className="p-4 mb-4" style={{ background: '#EFEBE3', borderRadius: 12 }}>
