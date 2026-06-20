@@ -120,3 +120,8 @@ create policy "chat_sessions: own rows only"
 -- Add chat_id FK to chat_messages (nullable so old rows aren't broken)
 alter table chat_messages
   add column if not exists chat_id uuid references chat_sessions(id) on delete cascade;
+
+-- 7. Meal type on nutrition logs (migration for existing DBs)
+alter table nutrition_logs
+  add column if not exists tipo_comida text
+    check (tipo_comida in ('desayuno','almuerzo','merienda','post_entreno','cena','suplementos'));

@@ -3,13 +3,17 @@ import { supabase } from '../lib/supabase'
 
 const todayDate = () => new Date().toISOString().split('T')[0]
 
-const MEALS = [
+const MAIN_MEALS = [
   { key: 'desayuno',     label: 'Desayuno' },
   { key: 'almuerzo',     label: 'Almuerzo' },
   { key: 'merienda',     label: 'Merienda' },
   { key: 'post_entreno', label: 'Post-Entreno' },
   { key: 'cena',         label: 'Cena' },
-  { key: 'suplementos',  label: 'Suplementos' },
+]
+
+const ALL_MEALS = [
+  ...MAIN_MEALS,
+  { key: 'suplementos', label: 'Suplementos' },
 ]
 
 const MACRO_ORDER  = ['proteina', 'carbs', 'grasa', 'otro']
@@ -21,9 +25,12 @@ const PALETTE = {
   red:    { bg: '#fde8df', text: '#a05030', dot: '#C4714A' },
 }
 
+const BORDER       = '1px solid #CCC8BF'
+const BORDER_THICK = '2px solid #C8C3BA'
+
 function categorizePlanItem(nombre) {
   const n = nombre.toLowerCase()
-  if (/pollo|pechuga|atún|salmón|carne|huevo|clara|proteín|yogurt|cottage|pavo|tilapia|bacalao|camarón|tofu|whey|caseín/i.test(n)) return 'proteina'
+  if (/pollo|pechuga|atún|salmón|carne|huevo|clara|proteín|yogurt|cottage|pavo|tilapia|bacalao|camarón|tofu|whey|caseín|turkey|bacon/i.test(n)) return 'proteina'
   if (/avena|arroz|pan|papa|batata|plátano|fruta|quinoa|pasta|tortilla|cereal|granola|maíz|frijol|lenteja|garbanzo|camote|yuca|mango|manzana|naranja|banana/i.test(n)) return 'carbs'
   if (/aceite|aguacate|mantequilla|nuez|almendra|maní|semilla|coco|manteca/i.test(n)) return 'grasa'
   return 'otro'
@@ -38,10 +45,10 @@ function categorizeLoggedItem(item) {
   return 'grasa'
 }
 
-function matchRatio(planItem, todayFoods) {
+function matchRatio(planItem, mealFoods) {
   const nameL = planItem.nombre.toLowerCase()
   const words  = nameL.split(/\s+/).filter(w => w.length > 3)
-  const matched = todayFoods.filter(f => {
+  const matched = mealFoods.filter(f => {
     const fName = (f.nombre || '').toLowerCase()
     return words.some(w => fName.includes(w)) || fName.includes(nameL) || nameL.includes(fName)
   })
@@ -58,62 +65,70 @@ function rowColor(ratio) {
   return 'red'
 }
 
-// ── Shared table constants ─────────────────────────────────────────────────
+// ── Meal section header ────────────────────────────────────────────────────
 
-const QTY_W       = 88   // fixed px width for quantity column
-const BORDER      = '1px solid #CCC8BF'
-const BORDER_THICK = '2px solid #C8C3BA'
-const COL_GRID    = `1fr ${QTY_W}px`
-
-function ColHeaders({ background = '#E0DCD4' }) {
+function MealHeader({ label, first }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, background, borderBottom: BORDER_THICK }}>
-      <div style={{ padding: '7px 14px', borderRight: BORDER }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#777' }}>Alimento</span>
-      </div>
-      <div style={{ padding: '7px 14px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#777' }}>Cantidad</span>
-      </div>
+    <div style={{
+      padding: '7px 14px',
+      background: '#EFEBE3',
+      borderTop: first ? 'none' : '3px double #C8C3BA',
+      borderBottom: BORDER,
+    }}>
+      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#C4714A' }}>
+        {label}
+      </span>
     </div>
   )
 }
 
+// ── Macro category sub-header ──────────────────────────────────────────────
+
 function MacroHeader({ label }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: '#F2EFE8', borderBottom: BORDER }}>
-      <div style={{ padding: '4px 14px', borderRight: BORDER }}>
-        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#aaa' }}>
-          {label}
-        </span>
+    <div style={{ padding: '4px 14px', background: '#F2EFE8', borderBottom: BORDER }}>
+      <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#aaa' }}>
+        {label}
+      </span>
+    </div>
+  )
+}
+
+// ── Two-line food row ──────────────────────────────────────────────────────
+
+function FoodRow({ nombre, cantidad, color }) {
+  const c = color ? PALETTE[color] : null
+  return (
+    <div style={{ padding: '9px 14px', background: c ? c.bg : '#F7F4EE', borderBottom: BORDER }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+        {c && <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0, marginTop: 1 }} />}
+        <span style={{ fontSize: 14, color: '#1C1C1A', lineHeight: 1.3 }}>{nombre}</span>
       </div>
-      <div />
+      <span style={{ fontSize: 13, color: c ? c.text : '#888', paddingLeft: c ? 16 : 0 }}>
+        {cantidad || '—'}
+      </span>
     </div>
   )
 }
 
 // ── Plan table (when user has a saved plan) ────────────────────────────────
 
-function PlanTable({ plan, todayFoods }) {
-  const activeMeals = MEALS.filter(m => (plan[m.key] || []).length > 0)
+function PlanTable({ plan, todayFoodsByMeal }) {
+  const activeMeals = ALL_MEALS.filter(m => (plan[m.key] || []).length > 0)
   if (!activeMeals.length) return null
 
   return (
     <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: BORDER_THICK }}>
-      <ColHeaders />
-
       {activeMeals.map((meal, mealIdx) => {
-        const items = plan[meal.key] || []
+        const items    = plan[meal.key] || []
+        const mealFoods = todayFoodsByMeal[meal.key] || []
+
         const grouped = Object.fromEntries(MACRO_ORDER.map(k => [k, []]))
         items.forEach(item => grouped[categorizePlanItem(item.nombre)].push(item))
 
         return (
-          <div key={meal.key} style={{ borderTop: mealIdx > 0 ? '3px double #C8C3BA' : 'none' }}>
-            {/* Meal section header — full width, no vertical split */}
-            <div style={{ padding: '6px 14px', background: '#EFEBE3', borderBottom: BORDER }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#C4714A' }}>
-                {meal.label}
-              </span>
-            </div>
+          <div key={meal.key}>
+            <MealHeader label={meal.label} first={mealIdx === 0} />
 
             {MACRO_ORDER.map(cat => {
               const catItems = grouped[cat]
@@ -121,29 +136,14 @@ function PlanTable({ plan, todayFoods }) {
               return (
                 <div key={cat}>
                   <MacroHeader label={MACRO_LABELS[cat]} />
-                  {catItems.map((item, i) => {
-                    const c = PALETTE[rowColor(matchRatio(item, todayFoods))]
-                    return (
-                      <div
-                        key={i}
-                        style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: c.bg, borderBottom: BORDER }}
-                      >
-                        {/* Alimento */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRight: BORDER, minWidth: 0 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                          <span style={{ fontSize: 14, color: '#1C1C1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {item.nombre}
-                          </span>
-                        </div>
-                        {/* Cantidad */}
-                        <div style={{ padding: '9px 14px', display: 'flex', alignItems: 'center' }}>
-                          <span style={{ fontSize: 13, color: c.text, whiteSpace: 'nowrap' }}>
-                            {item.descripcion || (item.cantidad_g ? `${item.cantidad_g}g` : '—')}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {catItems.map((item, i) => (
+                    <FoodRow
+                      key={i}
+                      nombre={item.nombre}
+                      cantidad={item.descripcion || (item.cantidad_g ? `${item.cantidad_g}g` : '—')}
+                      color={rowColor(matchRatio(item, mealFoods))}
+                    />
+                  ))}
                 </div>
               )
             })}
@@ -154,42 +154,95 @@ function PlanTable({ plan, todayFoods }) {
   )
 }
 
-// ── Logged foods table (no plan saved, show what was logged today) ──────────
+// ── Logged foods table (no plan, show today's logs) ────────────────────────
 
-function LoggedTable({ foods }) {
-  if (!foods.length) return null
-
-  const grouped = Object.fromEntries(MACRO_ORDER.map(k => [k, []]))
-  foods.forEach(item => grouped[categorizeLoggedItem(item)].push(item))
+function LoggedTable({ todayFoodsByMeal }) {
+  const mealsWithFood = ALL_MEALS.filter(m => (todayFoodsByMeal[m.key] || []).length > 0)
+  if (!mealsWithFood.length) return null
 
   return (
     <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: BORDER_THICK }}>
-      <ColHeaders />
+      {mealsWithFood.map((meal, mealIdx) => {
+        const foods   = todayFoodsByMeal[meal.key] || []
+        const grouped = Object.fromEntries(MACRO_ORDER.map(k => [k, []]))
+        foods.forEach(item => grouped[categorizeLoggedItem(item)].push(item))
 
-      {MACRO_ORDER.map(cat => {
-        const catItems = grouped[cat]
-        if (!catItems.length) return null
         return (
-          <div key={cat}>
-            <MacroHeader label={MACRO_LABELS[cat]} />
-            {catItems.map((item, i) => (
-              <div
-                key={i}
-                style={{ display: 'grid', gridTemplateColumns: COL_GRID, background: '#F7F4EE', borderBottom: BORDER }}
-              >
-                <div style={{ padding: '9px 14px', borderRight: BORDER }}>
-                  <span style={{ fontSize: 14, color: '#1C1C1A' }}>{item.nombre}</span>
+          <div key={meal.key}>
+            <MealHeader label={meal.label} first={mealIdx === 0} />
+            {MACRO_ORDER.map(cat => {
+              const catItems = grouped[cat]
+              if (!catItems.length) return null
+              return (
+                <div key={cat}>
+                  <MacroHeader label={MACRO_LABELS[cat]} />
+                  {catItems.map((item, i) => (
+                    <FoodRow
+                      key={i}
+                      nombre={item.nombre}
+                      cantidad={item.cantidad_g ? `${item.cantidad_g}g` : '—'}
+                      color={null}
+                    />
+                  ))}
                 </div>
-                <div style={{ padding: '9px 14px' }}>
-                  <span style={{ fontSize: 13, color: '#888', whiteSpace: 'nowrap' }}>
-                    {item.cantidad_g ? `${item.cantidad_g}g` : '—'}
-                  </span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ── Meal selector ──────────────────────────────────────────────────────────
+
+function MealSelector({ selected, onSelect, incluyeSupl, onToggleSupl }) {
+  return (
+    <div className="mb-4">
+      <p className="text-xs font-semibold mb-2" style={{ color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        ¿Cuál comida es esta?
+      </p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+        {MAIN_MEALS.map(m => {
+          const active = selected === m.key
+          return (
+            <button
+              key={m.key}
+              onClick={() => onSelect(active ? null : m.key)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 20,
+                border: `1px solid ${active ? '#C4714A' : '#DDD8CE'}`,
+                background: active ? '#C4714A' : 'transparent',
+                color: active ? '#fff' : '#666',
+                fontSize: 13,
+                fontWeight: 500,
+                transition: 'all 0.15s',
+              }}
+            >
+              {m.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {selected && (
+        <button
+          onClick={onToggleSupl}
+          style={{
+            padding: '5px 14px',
+            borderRadius: 20,
+            border: `1px solid ${incluyeSupl ? '#7A9E7E' : '#DDD8CE'}`,
+            background: incluyeSupl ? '#7A9E7E' : 'transparent',
+            color: incluyeSupl ? '#fff' : '#aaa',
+            fontSize: 12,
+            fontWeight: 500,
+            transition: 'all 0.15s',
+          }}
+        >
+          + Suplementos
+        </button>
+      )}
     </div>
   )
 }
@@ -224,29 +277,39 @@ function AlimentoRow({ item, onChange, onRemove }) {
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function NutritionLog({ session, isActive }) {
-  const [text, setText]       = useState('')
-  const [loading, setLoading] = useState(false)
-  const [parsed, setParsed]   = useState(null)
-  const [error, setError]     = useState('')
-  const [saved, setSaved]     = useState(false)
-  const [plan, setPlan]       = useState(null)
-  const [todayFoods, setTodayFoods] = useState([])
+  const [text, setText]             = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [parsed, setParsed]         = useState(null)
+  const [error, setError]           = useState('')
+  const [saved, setSaved]           = useState(false)
+  const [plan, setPlan]             = useState(null)
+  const [todayFoodsByMeal, setTodayFoodsByMeal] = useState(
+    Object.fromEntries(ALL_MEALS.map(m => [m.key, []]))
+  )
+  const [selectedMeal, setSelectedMeal] = useState(null)
+  const [incluyeSupl, setIncluyeSupl]   = useState(false)
 
   const fetchData = async () => {
     const uid = session.user.id
     const [planRes, todayRes] = await Promise.all([
       supabase.from('user_plan').select('nutricion').eq('user_id', uid).single(),
-      supabase.from('nutrition_logs').select('alimentos').eq('user_id', uid).eq('fecha', todayDate()),
+      supabase.from('nutrition_logs').select('alimentos, tipo_comida').eq('user_id', uid).eq('fecha', todayDate()),
     ])
     setPlan(planRes.data?.nutricion || null)
-    setTodayFoods((todayRes.data || []).flatMap(l => l.alimentos || []))
+
+    const byMeal = Object.fromEntries(ALL_MEALS.map(m => [m.key, []]))
+    for (const log of todayRes.data || []) {
+      const key = log.tipo_comida || 'desayuno'
+      if (byMeal[key]) byMeal[key].push(...(log.alimentos || []))
+    }
+    setTodayFoodsByMeal(byMeal)
   }
 
   useEffect(() => { fetchData() }, [session])
   useEffect(() => { if (isActive) fetchData() }, [isActive])
 
   const parseNutrition = async () => {
-    if (!text.trim()) return
+    if (!text.trim() || !selectedMeal) return
     setError('')
     setLoading(true)
     setParsed(null)
@@ -292,22 +355,32 @@ export default function NutritionLog({ session, isActive }) {
   }
 
   const save = async () => {
-    if (!parsed) return
+    if (!parsed || !selectedMeal) return
     setLoading(true)
-    const { error: err } = await supabase.from('nutrition_logs').insert({
-      user_id:               session.user.id,
-      fecha:                 todayDate(),
-      descripcion_original:  text,
-      alimentos:             parsed.alimentos,
-      totales:               parsed.totales,
-    })
+
+    const base = {
+      user_id:              session.user.id,
+      fecha:                todayDate(),
+      descripcion_original: text,
+      alimentos:            parsed.alimentos,
+      totales:              parsed.totales,
+    }
+
+    const rows = [{ ...base, tipo_comida: selectedMeal }]
+    if (incluyeSupl) rows.push({ ...base, tipo_comida: 'suplementos' })
+
+    const { error: err } = await supabase.from('nutrition_logs').insert(rows)
     setLoading(false)
     if (err) { setError(err.message); return }
+
     setSaved(true)
     setParsed(null)
     setText('')
+    setIncluyeSupl(false)
     fetchData()
   }
+
+  const canAnalyze = !!text.trim() && !!selectedMeal && !loading
 
   return (
     <div className="px-4 pt-8 pb-4">
@@ -316,24 +389,34 @@ export default function NutritionLog({ session, isActive }) {
       </h1>
 
       {plan
-        ? <PlanTable plan={plan} todayFoods={todayFoods} />
-        : <LoggedTable foods={todayFoods} />
+        ? <PlanTable plan={plan} todayFoodsByMeal={todayFoodsByMeal} />
+        : <LoggedTable todayFoodsByMeal={todayFoodsByMeal} />
       }
+
+      <MealSelector
+        selected={selectedMeal}
+        onSelect={(key) => { setSelectedMeal(key); setParsed(null); setSaved(false); setIncluyeSupl(false) }}
+        incluyeSupl={incluyeSupl}
+        onToggleSupl={() => setIncluyeSupl(prev => !prev)}
+      />
 
       <div className="mb-4">
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
-          placeholder="Ej: comí 2 huevos, 150g de claras, 50g de avena con leche de almendra..."
-          rows={4}
+          placeholder="Ej: 2 huevos, 150g de claras, 50g de avena con leche de almendra..."
+          rows={3}
           className="w-full px-4 py-3 text-base outline-none border resize-none"
           style={{ background: '#EFEBE3', borderColor: '#DDD8CE', color: '#1C1C1A', borderRadius: 10, lineHeight: 1.5 }}
         />
+        {!selectedMeal && text.trim().length > 0 && (
+          <p className="mt-1 text-xs" style={{ color: '#C4714A' }}>Selecciona una comida antes de analizar</p>
+        )}
         <button
           onClick={parseNutrition}
-          disabled={loading || !text.trim()}
+          disabled={!canAnalyze}
           className="w-full mt-2 py-3 font-medium text-white"
-          style={{ background: loading || !text.trim() ? '#d89a80' : '#C4714A', borderRadius: 8 }}
+          style={{ background: canAnalyze ? '#C4714A' : '#d89a80', borderRadius: 8 }}
         >
           {loading ? 'Analizando...' : 'Analizar con IA'}
         </button>
