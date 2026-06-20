@@ -66,26 +66,30 @@ export default function Chat({ session, isActive }) {
   const bottomRef  = useRef(null)
   const textareaRef = useRef(null)
 
-  // Load context (goals, plan, recent logs) once per mount
+  // Load context (full profile + logs) once per mount
   useEffect(() => {
     if (!session) return
     const uid  = session.user.id
     const from = new Date()
-    from.setDate(from.getDate() - 7)
+    from.setDate(from.getDate() - 14)   // 2 weeks of history
     const fromStr = from.toISOString().split('T')[0]
     Promise.all([
       supabase.from('user_goals').select('*').eq('user_id', uid).single(),
       supabase.from('user_plan').select('*').eq('user_id', uid).single(),
-      supabase.from('nutrition_logs').select('fecha, descripcion_original, totales').eq('user_id', uid).gte('fecha', fromStr).order('fecha', { ascending: false }),
+      supabase.from('nutrition_logs').select('fecha, tipo_comida, descripcion_original, totales').eq('user_id', uid).gte('fecha', fromStr).order('fecha', { ascending: false }),
       supabase.from('workout_logs').select('fecha, ejercicios').eq('user_id', uid).gte('fecha', fromStr).order('fecha', { ascending: false }),
-      supabase.from('nutrition_logs').select('descripcion_original, totales').eq('user_id', uid).eq('fecha', todayDate()),
-    ]).then(([goalsRes, planRes, nutRes, workRes, todayRes]) => {
+      supabase.from('nutrition_logs').select('tipo_comida, descripcion_original, totales').eq('user_id', uid).eq('fecha', todayDate()),
+      supabase.from('user_profile').select('*').eq('user_id', uid).single(),
+      supabase.from('weight_logs').select('fecha, peso_kg').eq('user_id', uid).order('fecha', { ascending: false }).limit(10),
+    ]).then(([goalsRes, planRes, nutRes, workRes, todayRes, profileRes, weightRes]) => {
       setContext({
         goals:           goalsRes.data,
         plan:            planRes.data,
-        recentNutrition: nutRes.data  || [],
-        recentWorkouts:  workRes.data || [],
-        todayLogs:       todayRes.data || [],
+        recentNutrition: nutRes.data    || [],
+        recentWorkouts:  workRes.data   || [],
+        todayLogs:       todayRes.data  || [],
+        profile:         profileRes.data,
+        weightLogs:      weightRes.data || [],
       })
     })
   }, [session])
@@ -195,8 +199,9 @@ export default function Chat({ session, isActive }) {
         { user_id: session.user.id, chat_id: chatId, role: 'assistant', content: data.content },
       ])
 
+      const uid = session.user.id
+
       if (data.plan) {
-        const uid = session.user.id
         const { data: existing } = await supabase.from('user_plan').select('id').eq('user_id', uid).single()
         if (existing) {
           await supabase.from('user_plan').update({
@@ -213,6 +218,17 @@ export default function Chat({ session, isActive }) {
         }
         setContext(prev => ({ ...prev, plan: data.plan }))
         setPlanSaved(true)
+      }
+
+      if (data.macros) {
+        const { data: existingGoals } = await supabase.from('user_goals').select('id').eq('user_id', uid).single()
+        const macroPayload = { ...data.macros, updated_at: new Date().toISOString() }
+        if (existingGoals) {
+          await supabase.from('user_goals').update(macroPayload).eq('id', existingGoals.id)
+        } else {
+          await supabase.from('user_goals').insert({ user_id: uid, ...macroPayload })
+        }
+        setContext(prev => ({ ...prev, goals: { ...prev.goals, ...data.macros } }))
       }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error al conectar. Intenta de nuevo.' }])
