@@ -1,74 +1,191 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const today = () => new Date().toISOString().split('T')[0]
+const todayDate = () => new Date().toISOString().split('T')[0]
 
 const MEALS = [
-  { key: 'desayuno', label: 'Desayuno' },
-  { key: 'almuerzo', label: 'Almuerzo' },
-  { key: 'merienda', label: 'Merienda' },
-  { key: 'post_entreno', label: 'Post-entreno' },
-  { key: 'cena', label: 'Cena' },
-  { key: 'suplementos', label: 'Suplementos' },
+  { key: 'desayuno',     label: 'Desayuno' },
+  { key: 'almuerzo',     label: 'Almuerzo' },
+  { key: 'merienda',     label: 'Merienda' },
+  { key: 'post_entreno', label: 'Post-Entreno' },
+  { key: 'cena',         label: 'Cena' },
+  { key: 'suplementos',  label: 'Suplementos' },
 ]
 
-function statusColor(pct) {
-  if (pct >= 90) return { bg: '#e8f0e9', text: '#5a8c5e', dot: '#7A9E7E' }
-  if (pct >= 50) return { bg: '#fef9ec', text: '#b8862a', dot: '#D4A843' }
-  return { bg: '#fde8df', text: '#a05030', dot: '#C4714A' }
+const MACRO_ORDER  = ['proteina', 'carbs', 'grasa', 'otro']
+const MACRO_LABELS = { proteina: 'Proteínas', carbs: 'Carbohidratos', grasa: 'Grasas', otro: 'Otros' }
+
+const PALETTE = {
+  green:  { bg: '#e8f0e9', text: '#5a8c5e', dot: '#7A9E7E' },
+  yellow: { bg: '#fef9ec', text: '#b8862a', dot: '#D4A843' },
+  red:    { bg: '#fde8df', text: '#a05030', dot: '#C4714A' },
 }
 
-function PlanSection({ plan, todayFoods }) {
-  const mealsWithItems = MEALS.filter(m => plan[m.key]?.length > 0)
-  if (!mealsWithItems.length) return null
+function categorizePlanItem(nombre) {
+  const n = nombre.toLowerCase()
+  if (/pollo|pechuga|atún|salmón|carne|huevo|clara|proteín|yogurt|cottage|pavo|tilapia|bacalao|camarón|tofu|whey|caseín/i.test(n)) return 'proteina'
+  if (/avena|arroz|pan|papa|batata|plátano|fruta|quinoa|pasta|tortilla|cereal|granola|maíz|frijol|lenteja|garbanzo|camote|yuca|mango|manzana|naranja|banana/i.test(n)) return 'carbs'
+  if (/aceite|aguacate|mantequilla|nuez|almendra|maní|semilla|coco|manteca/i.test(n)) return 'grasa'
+  return 'otro'
+}
 
-  const matchLogged = (planName) => {
-    const nameL = planName.toLowerCase()
-    const matched = todayFoods.filter(f =>
-      f.nombre?.toLowerCase().includes(nameL) || nameL.includes(f.nombre?.toLowerCase())
-    )
-    return matched.reduce((s, f) => s + (f.cantidad_g || 0), 0)
-  }
+function categorizeLoggedItem(item) {
+  const p = item.proteina_g || 0
+  const c = item.carbs_g    || 0
+  const g = item.grasa_g    || 0
+  if (p >= c && p >= g) return 'proteina'
+  if (c >= g)           return 'carbs'
+  return 'grasa'
+}
+
+function matchRatio(planItem, todayFoods) {
+  const nameL = planItem.nombre.toLowerCase()
+  const words  = nameL.split(/\s+/).filter(w => w.length > 3)
+  const matched = todayFoods.filter(f => {
+    const fName = (f.nombre || '').toLowerCase()
+    return words.some(w => fName.includes(w)) || fName.includes(nameL) || nameL.includes(fName)
+  })
+  if (!matched.length) return 0
+  const logged  = matched.reduce((s, f) => s + (f.cantidad_g || 0), 0)
+  const planned = planItem.cantidad_g
+  if (!planned) return logged > 0 ? 1 : 0
+  return logged / planned
+}
+
+function rowColor(ratio) {
+  if (ratio >= 0.8) return 'green'
+  if (ratio >= 0.5) return 'yellow'
+  return 'red'
+}
+
+// ── Plan table (when user has a saved plan) ────────────────────────────────
+
+function PlanTable({ plan, todayFoods }) {
+  const activeMeals = MEALS.filter(m => (plan[m.key] || []).length > 0)
+  if (!activeMeals.length) return null
 
   return (
-    <div className="mb-4 p-4" style={{ background: '#EFEBE3', borderRadius: 12 }}>
-      <p className="text-sm font-medium mb-3" style={{ color: '#888' }}>Plan del día</p>
-      {mealsWithItems.map(meal => (
-        <div key={meal.key} className="mb-3 last:mb-0">
-          <p className="text-xs font-medium uppercase tracking-wide mb-1.5" style={{ color: '#aaa' }}>
-            {meal.label}
-          </p>
-          <div className="flex flex-col gap-1">
-            {plan[meal.key].map((item, i) => {
-              const logged = matchLogged(item.nombre)
-              const pct = item.cantidad_g ? (logged / item.cantidad_g) * 100 : (logged > 0 ? 100 : 0)
-              const colors = statusColor(pct)
-              const hasLogged = todayFoods.length > 0
+    <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #DDD8CE' }}>
+      {/* Column headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#E8E4DC', borderBottom: '1px solid #DDD8CE', padding: '8px 16px' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Alimento</span>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Cantidad</span>
+      </div>
+
+      {activeMeals.map((meal, mealIdx) => {
+        const items = plan[meal.key] || []
+
+        const grouped = Object.fromEntries(MACRO_ORDER.map(k => [k, []]))
+        items.forEach(item => grouped[categorizePlanItem(item.nombre)].push(item))
+
+        return (
+          <div key={meal.key} style={{ borderTop: mealIdx > 0 ? '2px solid #DDD8CE' : 'none' }}>
+            {/* Meal header */}
+            <div style={{ padding: '7px 16px', background: '#EFEBE3' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#C4714A' }}>
+                {meal.label}
+              </span>
+            </div>
+
+            {MACRO_ORDER.map(cat => {
+              const catItems = grouped[cat]
+              if (!catItems.length) return null
               return (
-                <div
-                  key={i}
-                  className="flex justify-between items-center px-2.5 py-1.5 text-sm"
-                  style={{ background: hasLogged ? colors.bg : '#F7F4EE', borderRadius: 6 }}
-                >
-                  <div className="flex items-center gap-2">
-                    {hasLogged && (
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: colors.dot }} />
-                    )}
-                    <span style={{ color: '#1C1C1A' }}>{item.nombre}</span>
+                <div key={cat}>
+                  {/* Macro category sub-header */}
+                  <div style={{ padding: '4px 16px', background: '#F7F4EE', borderTop: '1px solid #EEE9E2', borderBottom: '1px solid #EEE9E2' }}>
+                    <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#bbb' }}>
+                      {MACRO_LABELS[cat]}
+                    </span>
                   </div>
-                  <span className="text-xs" style={{ color: hasLogged ? colors.text : '#bbb' }}>
-                    {item.descripcion || `${item.cantidad_g}g`}
-                    {hasLogged && ` · ${Math.round(logged)}g`}
-                  </span>
+                  {/* Food rows */}
+                  {catItems.map((item, i) => {
+                    const c = PALETTE[rowColor(matchRatio(item, todayFoods))]
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr auto',
+                          alignItems: 'center',
+                          padding: '9px 16px',
+                          background: c.bg,
+                          borderBottom: '1px solid #EEE9E2',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                          <span style={{ fontSize: 14, color: '#1C1C1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.nombre}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 13, color: c.text, marginLeft: 12, whiteSpace: 'nowrap' }}>
+                          {item.descripcion || (item.cantidad_g ? `${item.cantidad_g}g` : '—')}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
+
+// ── Logged foods table (no plan saved, show what was logged today) ──────────
+
+function LoggedTable({ foods }) {
+  if (!foods.length) return null
+
+  const grouped = Object.fromEntries(MACRO_ORDER.map(k => [k, []]))
+  foods.forEach(item => grouped[categorizeLoggedItem(item)].push(item))
+
+  return (
+    <div className="mb-6" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #DDD8CE' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', background: '#E8E4DC', borderBottom: '1px solid #DDD8CE', padding: '8px 16px' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Alimento</span>
+        <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#888' }}>Cantidad</span>
+      </div>
+
+      {MACRO_ORDER.map(cat => {
+        const catItems = grouped[cat]
+        if (!catItems.length) return null
+        return (
+          <div key={cat}>
+            <div style={{ padding: '4px 16px', background: '#F7F4EE', borderBottom: '1px solid #EEE9E2' }}>
+              <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#bbb' }}>
+                {MACRO_LABELS[cat]}
+              </span>
+            </div>
+            {catItems.map((item, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  alignItems: 'center',
+                  padding: '9px 16px',
+                  background: '#F7F4EE',
+                  borderBottom: '1px solid #EEE9E2',
+                }}
+              >
+                <span style={{ fontSize: 14, color: '#1C1C1A' }}>{item.nombre}</span>
+                <span style={{ fontSize: 13, color: '#888', marginLeft: 12, whiteSpace: 'nowrap' }}>
+                  {item.cantidad_g ? `${item.cantidad_g}g` : '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Editable row in confirmation dialog ───────────────────────────────────
 
 function AlimentoRow({ item, onChange, onRemove }) {
   return (
@@ -95,27 +212,25 @@ function AlimentoRow({ item, onChange, onRemove }) {
   )
 }
 
+// ── Main component ─────────────────────────────────────────────────────────
+
 export default function NutritionLog({ session, isActive }) {
-  const [text, setText] = useState('')
+  const [text, setText]       = useState('')
   const [loading, setLoading] = useState(false)
-  const [parsed, setParsed] = useState(null)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
-  const [history, setHistory] = useState([])
-  const [plan, setPlan] = useState(null)
+  const [parsed, setParsed]   = useState(null)
+  const [error, setError]     = useState('')
+  const [saved, setSaved]     = useState(false)
+  const [plan, setPlan]       = useState(null)
   const [todayFoods, setTodayFoods] = useState([])
 
   const fetchData = async () => {
     const uid = session.user.id
-    const [histRes, planRes, todayRes] = await Promise.all([
-      supabase.from('nutrition_logs').select('*').eq('user_id', uid).order('fecha', { ascending: false }).limit(10),
+    const [planRes, todayRes] = await Promise.all([
       supabase.from('user_plan').select('nutricion').eq('user_id', uid).single(),
-      supabase.from('nutrition_logs').select('alimentos').eq('user_id', uid).eq('fecha', today()),
+      supabase.from('nutrition_logs').select('alimentos').eq('user_id', uid).eq('fecha', todayDate()),
     ])
-    setHistory(histRes.data || [])
-    if (planRes.data?.nutricion) setPlan(planRes.data.nutricion)
-    const foods = (todayRes.data || []).flatMap(l => l.alimentos || [])
-    setTodayFoods(foods)
+    setPlan(planRes.data?.nutricion || null)
+    setTodayFoods((todayRes.data || []).flatMap(l => l.alimentos || []))
   }
 
   useEffect(() => { fetchData() }, [session])
@@ -131,7 +246,7 @@ export default function NutritionLog({ session, isActive }) {
       const res = await fetch('/api/parse-nutrition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text }),
       })
       if (!res.ok) throw new Error('Error al conectar con la API')
       const data = await res.json()
@@ -148,10 +263,10 @@ export default function NutritionLog({ session, isActive }) {
     const updated = [...parsed.alimentos]
     updated[index] = { ...updated[index], [field]: value }
     const totales = updated.reduce((acc, a) => ({
-      calorias: acc.calorias + (a.calorias || 0),
+      calorias:   acc.calorias   + (a.calorias   || 0),
       proteina_g: acc.proteina_g + (a.proteina_g || 0),
-      carbs_g: acc.carbs_g + (a.carbs_g || 0),
-      grasa_g: acc.grasa_g + (a.grasa_g || 0),
+      carbs_g:    acc.carbs_g    + (a.carbs_g    || 0),
+      grasa_g:    acc.grasa_g    + (a.grasa_g    || 0),
     }), { calorias: 0, proteina_g: 0, carbs_g: 0, grasa_g: 0 })
     setParsed({ alimentos: updated, totales })
   }
@@ -159,10 +274,10 @@ export default function NutritionLog({ session, isActive }) {
   const removeAlimento = (index) => {
     const updated = parsed.alimentos.filter((_, i) => i !== index)
     const totales = updated.reduce((acc, a) => ({
-      calorias: acc.calorias + (a.calorias || 0),
+      calorias:   acc.calorias   + (a.calorias   || 0),
       proteina_g: acc.proteina_g + (a.proteina_g || 0),
-      carbs_g: acc.carbs_g + (a.carbs_g || 0),
-      grasa_g: acc.grasa_g + (a.grasa_g || 0),
+      carbs_g:    acc.carbs_g    + (a.carbs_g    || 0),
+      grasa_g:    acc.grasa_g    + (a.grasa_g    || 0),
     }), { calorias: 0, proteina_g: 0, carbs_g: 0, grasa_g: 0 })
     setParsed({ alimentos: updated, totales })
   }
@@ -171,11 +286,11 @@ export default function NutritionLog({ session, isActive }) {
     if (!parsed) return
     setLoading(true)
     const { error: err } = await supabase.from('nutrition_logs').insert({
-      user_id: session.user.id,
-      fecha: today(),
-      descripcion_original: text,
-      alimentos: parsed.alimentos,
-      totales: parsed.totales,
+      user_id:               session.user.id,
+      fecha:                 todayDate(),
+      descripcion_original:  text,
+      alimentos:             parsed.alimentos,
+      totales:               parsed.totales,
     })
     setLoading(false)
     if (err) { setError(err.message); return }
@@ -191,7 +306,10 @@ export default function NutritionLog({ session, isActive }) {
         Nutrición
       </h1>
 
-      {plan && <PlanSection plan={plan} todayFoods={todayFoods} />}
+      {plan
+        ? <PlanTable plan={plan} todayFoods={todayFoods} />
+        : <LoggedTable foods={todayFoods} />
+      }
 
       <div className="mb-4">
         <textarea
@@ -213,50 +331,50 @@ export default function NutritionLog({ session, isActive }) {
       </div>
 
       {error && (
-        <p className="mb-4 text-sm px-3 py-2" style={{ background: '#fde8df', color: '#C4714A', borderRadius: 6 }}>{error}</p>
+        <p className="mb-4 text-sm px-3 py-2" style={{ background: '#fde8df', color: '#C4714A', borderRadius: 6 }}>
+          {error}
+        </p>
       )}
       {saved && (
-        <p className="mb-4 text-sm px-3 py-2" style={{ background: '#e8f0e9', color: '#7A9E7E', borderRadius: 6 }}>Guardado correctamente</p>
+        <p className="mb-4 text-sm px-3 py-2" style={{ background: '#e8f0e9', color: '#7A9E7E', borderRadius: 6 }}>
+          Guardado correctamente
+        </p>
       )}
 
       {parsed && (
         <div className="mb-4 p-4" style={{ background: '#EFEBE3', borderRadius: 12 }}>
           <p className="text-sm font-medium mb-3" style={{ color: '#888' }}>Confirma los valores</p>
           {parsed.alimentos.map((item, i) => (
-            <AlimentoRow key={i} item={item} onChange={(f, v) => updateAlimento(i, f, v)} onRemove={() => removeAlimento(i)} />
+            <AlimentoRow
+              key={i}
+              item={item}
+              onChange={(f, v) => updateAlimento(i, f, v)}
+              onRemove={() => removeAlimento(i)}
+            />
           ))}
           <div className="mt-3 pt-3 grid grid-cols-4 gap-2 text-center">
-            {[['Calorías', parsed.totales.calorias, 'kcal'], ['Proteína', parsed.totales.proteina_g, 'g'], ['Carbs', parsed.totales.carbs_g, 'g'], ['Grasa', parsed.totales.grasa_g, 'g']].map(([label, val, unit]) => (
+            {[
+              ['Calorías',  parsed.totales.calorias,   'kcal'],
+              ['Proteína',  parsed.totales.proteina_g, 'g'],
+              ['Carbs',     parsed.totales.carbs_g,    'g'],
+              ['Grasa',     parsed.totales.grasa_g,    'g'],
+            ].map(([label, val, unit]) => (
               <div key={label}>
                 <p className="text-lg font-medium" style={{ color: '#1C1C1A' }}>{Math.round(val)}</p>
                 <p className="text-[10px]" style={{ color: '#aaa' }}>{unit} {label.toLowerCase()}</p>
               </div>
             ))}
           </div>
-          <button onClick={save} disabled={loading} className="w-full mt-4 py-3 font-medium text-white" style={{ background: '#7A9E7E', borderRadius: 8 }}>
+          <button
+            onClick={save}
+            disabled={loading}
+            className="w-full mt-4 py-3 font-medium text-white"
+            style={{ background: '#7A9E7E', borderRadius: 8 }}
+          >
             {loading ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
       )}
-
-      <div>
-        <p className="text-sm font-medium mb-3" style={{ color: '#888' }}>Historial reciente</p>
-        {history.length === 0 ? (
-          <p className="text-sm" style={{ color: '#bbb' }}>Sin registros aún</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {history.map(log => (
-              <div key={log.id} className="p-3" style={{ background: '#EFEBE3', borderRadius: 10 }}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-xs" style={{ color: '#aaa' }}>{log.fecha}</span>
-                  <span className="text-sm font-medium" style={{ color: '#C4714A' }}>{log.totales?.calorias} kcal</span>
-                </div>
-                <p className="text-sm" style={{ color: '#666' }}>{log.descripcion_original}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

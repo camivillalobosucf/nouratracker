@@ -99,3 +99,24 @@ create policy "chat_messages: own rows only"
   on chat_messages for all
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- 6. Chat sessions (multi-conversation support)
+-- Migration for existing DBs: run the block below in Supabase SQL Editor
+
+create table if not exists chat_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  title text,
+  created_at timestamptz default now()
+);
+
+alter table chat_sessions enable row level security;
+
+create policy "chat_sessions: own rows only"
+  on chat_sessions for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- Add chat_id FK to chat_messages (nullable so old rows aren't broken)
+alter table chat_messages
+  add column if not exists chat_id uuid references chat_sessions(id) on delete cascade;
