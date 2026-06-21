@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+// Note: send is assigned to sendRef.current each render (no useCallback) to avoid
+// a Rolldown TDZ bug where the [send] dependency array is evaluated before send is initialized.
 import ReactMarkdown from 'react-markdown'
 import { supabase } from '../lib/supabase'
 
@@ -111,9 +113,6 @@ export default function Chat({ session, isActive }) {
   useEffect(() => { loadSessions() }, [loadSessions])
   useEffect(() => { if (isActive && view === 'list') loadSessions() }, [isActive]) // eslint-disable-line
 
-  // Keep sendRef current so auto-trigger can call latest version
-  useEffect(() => { sendRef.current = send }, [send])
-
   // Detect new user flag on tab activation
   useEffect(() => {
     if (!isActive) return
@@ -185,11 +184,13 @@ export default function Chat({ session, isActive }) {
     }
   }
 
-  const send = useCallback(async (textOverride) => {
+  // Assigned each render so sendRef.current always closes over current state.
+  // Using a ref instead of useCallback avoids a Rolldown TDZ in the [send] dep array.
+  sendRef.current = async (textOverride) => {
     const text = (textOverride ?? input).trim()
     if (!text || loading) return
 
-    const userMsg    = { role: 'user', content: text }
+    const userMsg     = { role: 'user', content: text }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     if (!textOverride) setInput('')
@@ -198,7 +199,6 @@ export default function Chat({ session, isActive }) {
     setLoading(true)
 
     try {
-      // Create session on first message of a new chat
       let chatId = activeChatId
       if (!chatId) {
         const title = text.length > 45 ? text.slice(0, 42) + '…' : text
@@ -207,6 +207,7 @@ export default function Chat({ session, isActive }) {
           .insert({ user_id: session.user.id, title })
           .select('id')
           .single()
+        if (!newSession) throw new Error('No se pudo crear la conversación')
         chatId = newSession.id
         setActiveChatId(chatId)
         setActiveChatTitle(title)
@@ -264,7 +265,7 @@ export default function Chat({ session, isActive }) {
     } finally {
       setLoading(false)
     }
-  }, [input, loading, messages, context, session, activeChatId])
+  }
 
   // ── List view ─────────────────────────────────────────────────────────────
 
@@ -385,7 +386,7 @@ export default function Chat({ session, isActive }) {
           ref={textareaRef}
           value={input}
           onChange={handleInputChange}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendRef.current() } }}
           placeholder="Escribe un mensaje..."
           rows={1}
           className="flex-1 px-3 py-2.5 outline-none border resize-none"
@@ -401,7 +402,7 @@ export default function Chat({ session, isActive }) {
           }}
         />
         <button
-          onClick={send}
+          onClick={() => sendRef.current()}
           disabled={loading || !input.trim()}
           className="shrink-0 w-11 h-11 flex items-center justify-center"
           style={{
