@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import logo from '../assets/logotransparent.svg'
 
 export default function Auth() {
   const [mode, setMode] = useState('login')
@@ -34,11 +35,9 @@ export default function Auth() {
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6" style={{ background: '#F7F4EE' }}>
       <div className="w-full max-w-sm">
-        <h1 className="text-4xl mb-1" style={{ fontFamily: "'DM Serif Display', serif", color: '#1C1C1A' }}>
-          Noura
-        </h1>
+        <img src={logo} alt="Noura" style={{ height: 52, marginBottom: 12 }} />
         <p className="text-sm mb-10" style={{ color: '#888' }}>
-          Tu tracker de nutrición y entrenamiento
+          Tu entrenadora personal de nutrición y fitness
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

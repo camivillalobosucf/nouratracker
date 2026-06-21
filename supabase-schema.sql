@@ -144,7 +144,14 @@ create policy "user_profile: own rows only"
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- 8. Meal type on nutrition logs (migration for existing DBs)
+-- 8. Onboarding flag + coaching style on user_profile
+alter table user_profile
+  add column if not exists onboarding_completado boolean default false;
+
+alter table user_profile
+  add column if not exists coaching_style text;
+
+-- 9. Meal type on nutrition logs (migration for existing DBs)
 alter table nutrition_logs
   add column if not exists tipo_comida text
     check (tipo_comida in ('desayuno','almuerzo','merienda','post_entreno','cena','suplementos'));

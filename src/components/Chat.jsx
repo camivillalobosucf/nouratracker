@@ -63,8 +63,10 @@ export default function Chat({ session, isActive }) {
   const [loading, setLoading]             = useState(false)
   const [planSaved, setPlanSaved]         = useState(false)
   const [context, setContext]             = useState({})
+  const [newUserPending, setNewUserPending] = useState(false)
   const bottomRef  = useRef(null)
   const textareaRef = useRef(null)
+  const sendRef    = useRef(null)
 
   // Load context (full profile + logs) once per mount
   useEffect(() => {
@@ -108,6 +110,33 @@ export default function Chat({ session, isActive }) {
 
   useEffect(() => { loadSessions() }, [loadSessions])
   useEffect(() => { if (isActive && view === 'list') loadSessions() }, [isActive]) // eslint-disable-line
+
+  // Keep sendRef current so auto-trigger can call latest version
+  useEffect(() => { sendRef.current = send }, [send])
+
+  // Detect new user flag on tab activation
+  useEffect(() => {
+    if (!isActive) return
+    if (localStorage.getItem('noura_new_user') !== '1') return
+    localStorage.removeItem('noura_new_user')
+    setView('chat')
+    setActiveChatId(null)
+    setActiveChatTitle('Plan inicial')
+    setMessages([{ role: 'assistant', content: GREETING }])
+    setPlanSaved(false)
+    setNewUserPending(true)
+  }, [isActive]) // eslint-disable-line
+
+  // Fire auto-trigger once context (profile) has loaded
+  useEffect(() => {
+    if (!newUserPending || !context.profile) return
+    setNewUserPending(false)
+    setTimeout(() => {
+      sendRef.current?.(
+        'Hola Noura! Acabo de registrarme y completar mi perfil. Por favor, crea mi plan personalizado de nutrición y entrenamiento basado en toda mi información.'
+      )
+    }, 400)
+  }, [newUserPending, context.profile])
 
   // Auto-scroll when messages change
   useEffect(() => {
@@ -156,14 +185,14 @@ export default function Chat({ session, isActive }) {
     }
   }
 
-  const send = useCallback(async () => {
-    const text = input.trim()
+  const send = useCallback(async (textOverride) => {
+    const text = (textOverride ?? input).trim()
     if (!text || loading) return
 
     const userMsg    = { role: 'user', content: text }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
-    setInput('')
+    if (!textOverride) setInput('')
     setPlanSaved(false)
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setLoading(true)

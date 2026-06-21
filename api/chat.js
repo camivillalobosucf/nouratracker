@@ -103,7 +103,7 @@ const ACTUALIZAR_MACROS_TOOL = {
 // ── Context formatter ──────────────────────────────────────────────────────
 
 function buildSystemPrompt(context) {
-  const { goals, plan, profile, recentNutrition, recentWorkouts, todayLogs, weightLogs } = context || {}
+  const { goals, plan, profile, recentNutrition, recentWorkouts, todayLogs, weightLogs, coachingStyle } = context || {}
   const today   = DAYS_ES[new Date().getDay()]
   const dateStr = new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -132,6 +132,7 @@ function buildSystemPrompt(context) {
     : 'Sin registros de peso'
 
   // Profile data
+  const coaching = profile?.coaching_style || coachingStyle || null
   const nombre   = profile?.nombre || null
   const edad     = profile?.edad
   const peso     = profile?.peso_kg
@@ -153,6 +154,13 @@ function buildSystemPrompt(context) {
   }
 
   return `Eres Noura, la entrenadora personal, nutricionista y coach de vida de ${nombre ? nombre : 'este usuario'}. No eres un chatbot genérico — eres su persona de confianza: amiga, confidente, experta.
+
+━━━ ESTILO DE COACHING ━━━
+${coaching === 'estricto'
+  ? 'Este usuario prefiere un estilo ESTRICTO: gramos exactos, disciplina, estructura clara, sin improvisación. Sé precisa y directa.'
+  : coaching === 'flexible'
+  ? 'Este usuario prefiere un estilo FLEXIBLE: variedad, opciones, sin rigidez. Da guía con libertad y adaptabilidad.'
+  : 'Aún no sabemos el estilo preferido del usuario. Pregúntale antes de crear su primer plan.'}
 
 ━━━ TU PERSONALIDAD ━━━
 • Hablas de tú siempre, como una amiga cercana y de confianza
