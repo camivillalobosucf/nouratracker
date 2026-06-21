@@ -61,13 +61,18 @@ export default function App() {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
       setSession(s)
-      if (s) {
+      if (!s) {
+        setOnboardingDone(false)
+        return
+      }
+      // Only re-check onboarding on actual sign-in, not token refreshes.
+      // handleOnboardingComplete() sets onboardingDone=true directly for
+      // the completion flow, and we must not overwrite it with a stale DB read.
+      if (event === 'SIGNED_IN') {
         const done = await checkOnboarding(s.user.id)
         setOnboardingDone(done)
-      } else {
-        setOnboardingDone(false)
       }
     })
 

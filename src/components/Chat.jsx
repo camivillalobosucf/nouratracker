@@ -270,7 +270,7 @@ export default function Chat({ session, isActive }) {
 
   if (view === 'list') {
     return (
-      <div className="flex flex-col" style={{ height: '100dvh' }}>
+      <div className="flex flex-col" style={{ height: '100dvh', background: '#F7F4EE' }}>
         {/* Header */}
         <div className="px-4 pt-10 pb-4 shrink-0" style={{ background: '#F7F4EE' }}>
           <h1 className="text-3xl mb-4" style={{ fontFamily: "'DM Serif Display', serif", color: '#1C1C1A' }}>
@@ -325,7 +325,7 @@ export default function Chat({ session, isActive }) {
   // ── Chat view ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col" style={{ height: '100dvh' }}>
+    <div className="flex flex-col" style={{ height: '100dvh', background: '#F7F4EE' }}>
       {/* Header */}
       <div
         className="px-4 pt-10 pb-3 flex items-center gap-3 shrink-0"
