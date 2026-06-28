@@ -213,13 +213,18 @@ export default function Chat({ session, isActive }) {
         setActiveChatTitle(title)
       }
 
+      // Anthropic requires the first message to be from 'user'.
+      // Strip any leading assistant messages (e.g. the UI greeting).
+      const firstUser = newMessages.findIndex(m => m.role === 'user')
+      const apiMessages = firstUser >= 0 ? newMessages.slice(firstUser) : newMessages
+
       const res = await fetch('/api/chat', {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body:    JSON.stringify({ messages: newMessages, context }),
+        body:    JSON.stringify({ messages: apiMessages, context }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
