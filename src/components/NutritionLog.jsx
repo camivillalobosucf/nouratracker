@@ -223,7 +223,7 @@ function PlanFoodRow({ nombre, cantidad, color, alternatives, errorReason, onWhy
             )}
           </div>
         </div>
-        <div style={{ padding: '10px 14px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        <div style={{ padding: '10px 14px', wordBreak: 'break-word', overflowWrap: 'break-word', hyphens: 'auto' }}>
           <span style={{ fontSize: 13, color: '#555', lineHeight: 1.4 }}>{cantidad || '—'}</span>
         </div>
       </div>
@@ -238,7 +238,7 @@ function PlanFoodRow({ nombre, cantidad, color, alternatives, errorReason, onWhy
             <span style={{ fontSize: 11, color: '#C4714A', flexShrink: 0, marginTop: 1, lineHeight: 1, fontWeight: 600 }}>o</span>
             <span style={{ fontSize: 13, color: '#777', lineHeight: 1.4 }}>{alt.nombre}</span>
           </div>
-          <div style={{ padding: '6px 14px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+          <div style={{ padding: '6px 14px', wordBreak: 'break-word', overflowWrap: 'break-word', hyphens: 'auto' }}>
             <span style={{ fontSize: 12, color: '#999', lineHeight: 1.4 }}>{alt.cantidad}</span>
           </div>
         </div>
@@ -257,7 +257,7 @@ function FoodRow({ nombre, cantidad, color }) {
         {c && <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0, marginTop: 4 }} />}
         <span style={{ fontSize: 14, color: '#1C1C1A', lineHeight: 1.4 }}>{nombre}</span>
       </div>
-      <div style={{ padding: '10px 14px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+      <div style={{ padding: '10px 14px', wordBreak: 'break-word', overflowWrap: 'break-word', hyphens: 'auto' }}>
         <span style={{ fontSize: 13, color: '#555', lineHeight: 1.4 }}>{cantidad || '—'}</span>
       </div>
     </div>
