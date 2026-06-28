@@ -1,10 +1,26 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+async function getUser(token) {
+  const admin = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+  const { data: { user }, error } = await admin.auth.getUser(token)
+  return error ? null : user
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  if (!token || !(await getUser(token))) {
+    return res.status(401).json({ error: 'No autorizado' })
   }
 
   const { text } = req.body
