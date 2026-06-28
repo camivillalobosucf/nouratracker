@@ -237,18 +237,18 @@ Peso reciente: ${weightSummary}
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  if (!token || !(await getUser(token))) {
-    return res.status(401).json({ error: 'No autorizado' })
-  }
-
-  const { messages, context } = req.body
-  if (!messages?.length) return res.status(400).json({ error: 'Faltan mensajes' })
-
-  const systemPrompt = buildSystemPrompt(context)
-  const tools = [GUARDAR_PLAN_TOOL, ACTUALIZAR_MACROS_TOOL]
-
   try {
+    const token = req.headers.authorization?.replace('Bearer ', '')
+    if (!token || !(await getUser(token))) {
+      return res.status(401).json({ error: 'No autorizado' })
+    }
+
+    const { messages, context } = req.body
+    if (!messages?.length) return res.status(400).json({ error: 'Faltan mensajes' })
+
+    const systemPrompt = buildSystemPrompt(context)
+    const tools = [GUARDAR_PLAN_TOOL, ACTUALIZAR_MACROS_TOOL]
+
     const response = await client.messages.create({
       model:      'claude-sonnet-4-6',
       max_tokens: 2048,
